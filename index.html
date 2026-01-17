@@ -1,0 +1,964 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Ezra's Money Machine</title>
+    <meta name="description" content="A financial learning tool for Ezra by Taitt Fin." />
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Chart.js for line chart -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <!-- Confetti -->
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+
+    <!-- React and ReactDOM UMD builds -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+
+    <!-- Babel in-browser JSX transform -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    animation: {
+                        'bounce-slow': 'bounce 2s infinite',
+                        'pulse-glow': 'pulse-glow 2s infinite',
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        body { background-color: #0f172a; color: white; transition: background-color 0.3s, color 0.3s; }
+        body.light-mode { background-color: #f1f5f9; color: #1e293b; }
+        .slider-thumb::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 25px;
+            height: 25px;
+            background: #fbbf24;
+            cursor: pointer;
+            border-radius: 50%;
+            box-shadow: 0 0 10px rgba(251, 191, 36, 0.5);
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes countUp {
+            from { transform: scale(1.1); }
+            to { transform: scale(1); }
+        }
+        .animate-in {
+            animation: fadeIn 0.5s ease-out forwards;
+        }
+        .animate-count {
+            animation: countUp 0.3s ease-out;
+        }
+        @keyframes pulse-glow {
+            0%, 100% { box-shadow: 0 0 5px rgba(251, 191, 36, 0.5); }
+            50% { box-shadow: 0 0 20px rgba(251, 191, 36, 0.8); }
+        }
+        .badge-locked { filter: grayscale(100%); opacity: 0.4; }
+        .modal-backdrop {
+            background: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(4px);
+        }
+        .toast {
+            animation: fadeIn 0.3s ease-out, fadeOut 0.3s ease-out 2.7s forwards;
+        }
+        @keyframes fadeOut {
+            to { opacity: 0; transform: translateY(-10px); }
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef, useCallback } = React;
+
+        // ============ SOUND EFFECTS ============
+        const useSounds = (enabled) => {
+            const audioContext = useRef(null);
+            
+            const playSound = useCallback((type) => {
+                if (!enabled) return;
+                try {
+                    if (!audioContext.current) {
+                        audioContext.current = new (window.AudioContext || window.webkitAudioContext)();
+                    }
+                    const ctx = audioContext.current;
+                    const oscillator = ctx.createOscillator();
+                    const gainNode = ctx.createGain();
+                    oscillator.connect(gainNode);
+                    gainNode.connect(ctx.destination);
+                    
+                    if (type === 'coin') {
+                        oscillator.frequency.setValueAtTime(800, ctx.currentTime);
+                        oscillator.frequency.exponentialRampToValueAtTime(1200, ctx.currentTime + 0.1);
+                        gainNode.gain.setValueAtTime(0.1, ctx.currentTime);
+                        gainNode.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.1);
+                        oscillator.start(ctx.currentTime);
+                        oscillator.stop(ctx.currentTime + 0.1);
+                    } else if (type === 'milestone') {
+                        oscillator.frequency.setValueAtTime(523, ctx.currentTime);
+                        oscillator.frequency.setValueAtTime(659, ctx.currentTime + 0.1);
+                        oscillator.frequency.setValueAtTime(784, ctx.currentTime + 0.2);
+                        gainNode.gain.setValueAtTime(0.15, ctx.currentTime);
+                        gainNode.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.4);
+                        oscillator.start(ctx.currentTime);
+                        oscillator.stop(ctx.currentTime + 0.4);
+                    } else if (type === 'badge') {
+                        oscillator.type = 'triangle';
+                        oscillator.frequency.setValueAtTime(440, ctx.currentTime);
+                        oscillator.frequency.setValueAtTime(554, ctx.currentTime + 0.1);
+                        oscillator.frequency.setValueAtTime(659, ctx.currentTime + 0.2);
+                        oscillator.frequency.setValueAtTime(880, ctx.currentTime + 0.3);
+                        gainNode.gain.setValueAtTime(0.12, ctx.currentTime);
+                        gainNode.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.5);
+                        oscillator.start(ctx.currentTime);
+                        oscillator.stop(ctx.currentTime + 0.5);
+                    }
+                } catch (e) {
+                    console.log('Sound not available');
+                }
+            }, [enabled]);
+            
+            return { playSound };
+        };
+
+        // ============ ANIMATED NUMBER ============
+        const AnimatedNumber = ({ value, prefix = '$', duration = 500 }) => {
+            const [displayValue, setDisplayValue] = useState(value);
+            const previousValue = useRef(value);
+            const animationRef = useRef(null);
+            
+            useEffect(() => {
+                const startValue = previousValue.current;
+                const endValue = value;
+                const startTime = performance.now();
+                
+                const animate = (currentTime) => {
+                    const elapsed = currentTime - startTime;
+                    const progress = Math.min(elapsed / duration, 1);
+                    const easeOut = 1 - Math.pow(1 - progress, 3);
+                    const currentValue = startValue + (endValue - startValue) * easeOut;
+                    setDisplayValue(currentValue);
+                    
+                    if (progress < 1) {
+                        animationRef.current = requestAnimationFrame(animate);
+                    } else {
+                        previousValue.current = endValue;
+                    }
+                };
+                
+                animationRef.current = requestAnimationFrame(animate);
+                return () => cancelAnimationFrame(animationRef.current);
+            }, [value, duration]);
+            
+            return <span className="animate-count">{prefix}{displayValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>;
+        };
+
+        // ============ TOAST NOTIFICATION ============
+        const Toast = ({ message, onClose }) => {
+            useEffect(() => {
+                const timer = setTimeout(onClose, 3000);
+                return () => clearTimeout(timer);
+            }, [onClose]);
+            
+            return (
+                <div className="fixed top-20 left-1/2 transform -translate-x-1/2 z-50 toast">
+                    <div className="bg-gradient-to-r from-yellow-400 to-orange-500 text-slate-900 px-6 py-3 rounded-full font-bold shadow-lg flex items-center gap-2">
+                        🎉 {message}
+                    </div>
+                </div>
+            );
+        };
+
+        // ============ MODAL ============
+        const Modal = ({ isOpen, onClose, title, children }) => {
+            if (!isOpen) return null;
+            return (
+                <div className="fixed inset-0 z-50 flex items-center justify-center modal-backdrop" onClick={onClose}>
+                    <div className="bg-slate-800 rounded-2xl border border-slate-700 p-6 max-w-md w-full mx-4 shadow-2xl" onClick={e => e.stopPropagation()}>
+                        <div className="flex justify-between items-center mb-4">
+                            <h3 className="text-xl font-bold text-white">{title}</h3>
+                            <button onClick={onClose} className="text-slate-400 hover:text-white text-2xl">&times;</button>
+                        </div>
+                        {children}
+                    </div>
+                </div>
+            );
+        };
+
+        // ============ CARD COMPONENT ============
+        const Card = ({ children, className = "" }) => (
+            <div className={`bg-slate-800 dark:bg-slate-800 rounded-2xl border border-slate-700 p-6 shadow-xl ${className}`}>
+                {children}
+            </div>
+        );
+
+        // ============ COIN RULE COMPONENT ============
+        const CoinRule = ({ percentage, coinName, coinColor, emoji, description, value }) => (
+            <div className="flex items-center gap-4 bg-slate-900/50 p-4 rounded-xl border border-slate-700/50 mb-3 hover:border-yellow-400/50 transition-all cursor-pointer group">
+                <div className="flex flex-col items-center justify-center w-16">
+                    <div className={`w-12 h-12 rounded-full flex items-center justify-center text-2xl shadow-lg ${coinColor} group-hover:scale-110 transition-transform`}>
+                        {percentage > 0 ? '$' : '❌'}
+                    </div>
+                    <span className="text-xs text-slate-400 mt-1 font-mono">{percentage}%</span>
+                </div>
+                <div className="flex-1">
+                    <div className="flex justify-between items-center">
+                        <h4 className="font-bold text-white text-lg">{coinName} Rule</h4>
+                        <span className="text-2xl">{emoji}</span>
+                    </div>
+                    <p className="text-slate-300 text-sm leading-snug">{description}</p>
+                    <div className="mt-2 text-xs font-mono text-yellow-400 bg-yellow-400/10 inline-block px-2 py-1 rounded">
+                        For every $1.00 → You get a {value}
+                    </div>
+                </div>
+            </div>
+        );
+
+        // ============ BADGE COMPONENT ============
+        const Badge = ({ name, emoji, description, unlocked }) => (
+            <div className={`relative group ${!unlocked ? 'badge-locked' : ''}`}>
+                <div className={`w-10 h-10 rounded-full flex items-center justify-center text-xl ${unlocked ? 'bg-yellow-400' : 'bg-slate-600'} cursor-pointer transform hover:scale-110 transition-transform`}>
+                    {emoji}
+                </div>
+                <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-slate-900 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-10 border border-slate-700">
+                    <div className="font-bold">{name}</div>
+                    <div className="text-slate-400">{description}</div>
+                    {!unlocked && <div className="text-yellow-400 mt-1">🔒 Locked</div>}
+                </div>
+            </div>
+        );
+
+        // ============ LINE CHART COMPONENT ============
+        const GrowthChart = ({ monthlyContribution = 0 }) => {
+            const chartRef = useRef(null);
+            const chartInstance = useRef(null);
+            
+            const initialBalances = { chase: 134.01, savings: 1202.46, cd: 520.00, roth: 1081.64 };
+            
+            useEffect(() => {
+                if (!chartRef.current) return;
+                
+                const ages = Array.from({length: 13}, (_, i) => i + 6);
+                const generateData = (initial, rate) => {
+                    return ages.map((age, i) => {
+                        let total = initial * Math.pow(1 + rate, i);
+                        // Add monthly contributions
+                        if (monthlyContribution > 0) {
+                            for (let year = 0; year < i; year++) {
+                                total += monthlyContribution * 12 * Math.pow(1 + rate, i - year - 1);
+                            }
+                        }
+                        return total;
+                    });
+                };
+                
+                if (chartInstance.current) {
+                    chartInstance.current.destroy();
+                }
+                
+                chartInstance.current = new Chart(chartRef.current, {
+                    type: 'line',
+                    data: {
+                        labels: ages.map(a => `Age ${a}`),
+                        datasets: [
+                            { label: 'Chase (0%)', data: generateData(initialBalances.chase, 0), borderColor: '#64748b', backgroundColor: 'rgba(100, 116, 139, 0.1)', tension: 0.3, fill: false },
+                            { label: 'Savings (1%)', data: generateData(initialBalances.savings, 0.01), borderColor: '#f97316', backgroundColor: 'rgba(249, 115, 22, 0.1)', tension: 0.3, fill: false },
+                            { label: 'CD (5%)', data: generateData(initialBalances.cd, 0.05), borderColor: '#3b82f6', backgroundColor: 'rgba(59, 130, 246, 0.1)', tension: 0.3, fill: false },
+                            { label: 'Roth IRA (25%)', data: generateData(initialBalances.roth, 0.25), borderColor: '#fbbf24', backgroundColor: 'rgba(251, 191, 36, 0.1)', tension: 0.3, fill: true }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: { position: 'bottom', labels: { color: '#94a3b8', padding: 15, usePointStyle: true } },
+                            tooltip: { mode: 'index', intersect: false, backgroundColor: '#1e293b', titleColor: '#fff', bodyColor: '#94a3b8', borderColor: '#475569', borderWidth: 1 }
+                        },
+                        scales: {
+                            x: { grid: { color: 'rgba(71, 85, 105, 0.3)' }, ticks: { color: '#94a3b8' } },
+                            y: { grid: { color: 'rgba(71, 85, 105, 0.3)' }, ticks: { color: '#94a3b8', callback: v => '$' + v.toLocaleString() } }
+                        },
+                        interaction: { mode: 'nearest', axis: 'x', intersect: false }
+                    }
+                });
+                
+                return () => chartInstance.current?.destroy();
+            }, [monthlyContribution]);
+            
+            return <div className="h-64"><canvas ref={chartRef}></canvas></div>;
+        };
+
+        // ============ QUIZ COMPONENT ============
+        const QuizMode = ({ onComplete, onUnlockBadge }) => {
+            const [currentQuestion, setCurrentQuestion] = useState(0);
+            const [score, setScore] = useState(0);
+            const [showResult, setShowResult] = useState(false);
+            const [selectedAnswer, setSelectedAnswer] = useState(null);
+            
+            const questions = [
+                { q: "Which account grows your money the FASTEST?", options: ["Chase Checking", "Savings Account", "Roth IRA", "Under your mattress"], correct: 2 },
+                { q: "What does 5% interest mean?", options: ["You lose 5 cents per dollar", "You get 5 cents per dollar each year", "You pay $5 per month", "Your money stays the same"], correct: 1 },
+                { q: "Why is the Roth IRA called 'Rocket Money'?", options: ["It's stored in a rocket", "It grows super fast", "You can only use it in space", "It makes rocket sounds"], correct: 1 },
+                { q: "What happens to money in a checking account (0%)?", options: ["It doubles every year", "It grows slowly", "It stays the same", "It disappears"], correct: 2 },
+                { q: "If you save $10 every month, what happens over time?", options: ["Nothing special", "Your money grows even more!", "You lose money", "The bank takes it"], correct: 1 }
+            ];
+            
+            const handleAnswer = (index) => {
+                setSelectedAnswer(index);
+                setTimeout(() => {
+                    if (index === questions[currentQuestion].correct) {
+                        setScore(s => s + 1);
+                    }
+                    if (currentQuestion < questions.length - 1) {
+                        setCurrentQuestion(c => c + 1);
+                        setSelectedAnswer(null);
+                    } else {
+                        setShowResult(true);
+                        if (score + (index === questions[currentQuestion].correct ? 1 : 0) >= 3) {
+                            onUnlockBadge('quiz');
+                        }
+                        onComplete();
+                    }
+                }, 1000);
+            };
+            
+            if (showResult) {
+                const passed = score >= 3;
+                return (
+                    <div className="text-center py-8 animate-in">
+                        <div className="text-6xl mb-4">{passed ? '🏆' : '📚'}</div>
+                        <h3 className="text-2xl font-bold mb-2">{passed ? 'Amazing!' : 'Keep Learning!'}</h3>
+                        <p className="text-slate-400 mb-4">You got {score} out of {questions.length} correct!</p>
+                        {passed && <div className="text-yellow-400 font-bold">🎖️ Quiz Master Badge Unlocked!</div>}
+                    </div>
+                );
+            }
+            
+            return (
+                <div className="animate-in">
+                    <div className="flex justify-between items-center mb-4">
+                        <span className="text-sm text-slate-400">Question {currentQuestion + 1}/{questions.length}</span>
+                        <span className="text-sm text-yellow-400">Score: {score}</span>
+                    </div>
+                    <div className="bg-slate-700/50 rounded-full h-2 mb-6">
+                        <div className="bg-yellow-400 h-2 rounded-full transition-all" style={{width: `${((currentQuestion + 1) / questions.length) * 100}%`}}></div>
+                    </div>
+                    <h3 className="text-xl font-bold mb-6">{questions[currentQuestion].q}</h3>
+                    <div className="space-y-3">
+                        {questions[currentQuestion].options.map((option, i) => (
+                            <button
+                                key={i}
+                                onClick={() => selectedAnswer === null && handleAnswer(i)}
+                                className={`w-full p-4 rounded-xl text-left font-medium transition-all ${
+                                    selectedAnswer === null 
+                                        ? 'bg-slate-700 hover:bg-slate-600 border border-slate-600 hover:border-yellow-400' 
+                                        : selectedAnswer === i 
+                                            ? i === questions[currentQuestion].correct 
+                                                ? 'bg-green-600 border border-green-500' 
+                                                : 'bg-red-600 border border-red-500'
+                                            : i === questions[currentQuestion].correct 
+                                                ? 'bg-green-600/50 border border-green-500'
+                                                : 'bg-slate-700 border border-slate-600 opacity-50'
+                                }`}
+                            >
+                                {option}
+                            </button>
+                        ))}
+                    </div>
+                </div>
+            );
+        };
+
+        // ============ PARENT DASHBOARD ============
+        const ParentDashboard = ({ balances, onUpdateBalances, onClose }) => {
+            const [pin, setPin] = useState('');
+            const [authenticated, setAuthenticated] = useState(false);
+            const [newBalances, setNewBalances] = useState(balances);
+            const PARENT_PIN = '1234';
+            
+            const handleAuth = () => {
+                if (pin === PARENT_PIN) setAuthenticated(true);
+            };
+            
+            const handleSave = () => {
+                onUpdateBalances(newBalances);
+                onClose();
+            };
+            
+            if (!authenticated) {
+                return (
+                    <div className="text-center">
+                        <p className="text-slate-400 mb-4">Enter parent PIN to access dashboard</p>
+                        <input
+                            type="password"
+                            value={pin}
+                            onChange={e => setPin(e.target.value)}
+                            placeholder="Enter PIN"
+                            className="w-full p-3 rounded-lg bg-slate-700 border border-slate-600 text-white mb-4"
+                            maxLength={4}
+                        />
+                        <button onClick={handleAuth} className="w-full py-3 bg-indigo-600 hover:bg-indigo-500 rounded-lg font-bold transition-colors">
+                            Unlock
+                        </button>
+                        <p className="text-xs text-slate-500 mt-4">Default PIN: 1234</p>
+                    </div>
+                );
+            }
+            
+            return (
+                <div className="space-y-4">
+                    <p className="text-sm text-slate-400 mb-4">Update Ezra's real account balances:</p>
+                    {Object.entries(newBalances).map(([key, value]) => (
+                        <div key={key} className="flex items-center gap-3">
+                            <label className="w-24 text-sm font-medium capitalize">{key}</label>
+                            <input
+                                type="number"
+                                value={value}
+                                onChange={e => setNewBalances({...newBalances, [key]: parseFloat(e.target.value) || 0})}
+                                className="flex-1 p-2 rounded-lg bg-slate-700 border border-slate-600 text-white"
+                            />
+                        </div>
+                    ))}
+                    <button onClick={handleSave} className="w-full py-3 bg-green-600 hover:bg-green-500 rounded-lg font-bold transition-colors mt-4">
+                        💾 Save Balances
+                    </button>
+                </div>
+            );
+        };
+
+        // ============ MAIN APP ============
+        function EzraMoneyApp() {
+            // State
+            const [activeTab, setActiveTab] = useState('timeMachine');
+            const [age, setAge] = useState(6);
+            const [darkMode, setDarkMode] = useState(true);
+            const [soundEnabled, setSoundEnabled] = useState(true);
+            const [monthlyContribution, setMonthlyContribution] = useState(0);
+            const [showDepositCalc, setShowDepositCalc] = useState(false);
+            const [depositAmount, setDepositAmount] = useState(100);
+            const [showRothInfo, setShowRothInfo] = useState(false);
+            const [showQuiz, setShowQuiz] = useState(false);
+            const [showParentDashboard, setShowParentDashboard] = useState(false);
+            const [toast, setToast] = useState(null);
+            const [goal, setGoal] = useState(() => {
+                const saved = localStorage.getItem('ezra_goal');
+                return saved ? JSON.parse(saved) : { amount: 5000, description: 'First Car', targetAge: 16 };
+            });
+            const [showGoalModal, setShowGoalModal] = useState(false);
+            
+            // Badges
+            const [badges, setBadges] = useState(() => {
+                const saved = localStorage.getItem('ezra_badges');
+                return saved ? JSON.parse(saved) : { timeTravel: false, tenK: false, coinRules: false, quiz: false };
+            });
+            
+            // Balances (can be updated by parent)
+            const [balances, setBalances] = useState(() => {
+                const saved = localStorage.getItem('ezra_balances');
+                return saved ? JSON.parse(saved) : { chase: 134.01, savings: 1202.46, cd: 520.00, roth: 1081.64 };
+            });
+            
+            // Milestones tracking
+            const [celebratedMilestones, setCelebratedMilestones] = useState(() => {
+                const saved = localStorage.getItem('ezra_milestones');
+                return saved ? JSON.parse(saved) : [];
+            });
+            
+            const { playSound } = useSounds(soundEnabled);
+            
+            const yearsPassed = Math.max(0, age - 6);
+            
+            // Calculate values with optional monthly contribution
+            const calculateGrowth = (initial, rate, years, monthly = 0) => {
+                let total = initial * Math.pow(1 + rate, years);
+                for (let year = 0; year < years; year++) {
+                    total += monthly * 12 * Math.pow(1 + rate, years - year - 1);
+                }
+                return total;
+            };
+            
+            const currentValues = {
+                chase: calculateGrowth(balances.chase, 0, yearsPassed, monthlyContribution),
+                savings: calculateGrowth(balances.savings, 0.01, yearsPassed, monthlyContribution),
+                cd: calculateGrowth(balances.cd, 0.05, yearsPassed, monthlyContribution),
+                roth: calculateGrowth(balances.roth, 0.25, yearsPassed, monthlyContribution)
+            };
+            
+            const totalMoney = Object.values(currentValues).reduce((a, b) => a + b, 0);
+            const initialTotal = Object.values(balances).reduce((a, b) => a + b, 0);
+            const profit = totalMoney - initialTotal;
+            
+            const pct = (val) => totalMoney > 0 ? Math.round((val / totalMoney) * 100) : 0;
+            
+            // Unlock badge helper
+            const unlockBadge = useCallback((badgeName) => {
+                if (!badges[badgeName]) {
+                    const newBadges = { ...badges, [badgeName]: true };
+                    setBadges(newBadges);
+                    localStorage.setItem('ezra_badges', JSON.stringify(newBadges));
+                    playSound('badge');
+                    setToast(`🎖️ Badge Unlocked: ${badgeName === 'timeTravel' ? 'Time Traveler' : badgeName === 'tenK' ? '$10K Club' : badgeName === 'coinRules' ? 'Money Expert' : 'Quiz Master'}!`);
+                }
+            }, [badges, playSound]);
+            
+            // Check milestones
+            useEffect(() => {
+                const milestones = [5000, 10000, 25000, 50000, 100000];
+                milestones.forEach(milestone => {
+                    if (totalMoney >= milestone && !celebratedMilestones.includes(milestone)) {
+                        confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
+                        playSound('milestone');
+                        setToast(`🎉 Milestone: $${(milestone/1000).toFixed(0)}K reached!`);
+                        const newCelebrated = [...celebratedMilestones, milestone];
+                        setCelebratedMilestones(newCelebrated);
+                        localStorage.setItem('ezra_milestones', JSON.stringify(newCelebrated));
+                        if (milestone >= 10000) unlockBadge('tenK');
+                    }
+                });
+            }, [totalMoney, celebratedMilestones, playSound, unlockBadge]);
+            
+            // Time travel badge
+            useEffect(() => {
+                if (age > 6 && !badges.timeTravel) {
+                    unlockBadge('timeTravel');
+                }
+            }, [age, badges.timeTravel, unlockBadge]);
+            
+            // Handle slider change with sound
+            const handleAgeChange = (newAge) => {
+                if (newAge !== age) {
+                    playSound('coin');
+                }
+                setAge(newAge);
+            };
+            
+            // Handle balance updates
+            const handleUpdateBalances = (newBalances) => {
+                setBalances(newBalances);
+                localStorage.setItem('ezra_balances', JSON.stringify(newBalances));
+                localStorage.setItem('ezra_balances_updated', new Date().toISOString());
+            };
+            
+            // Handle goal save
+            const handleSaveGoal = () => {
+                localStorage.setItem('ezra_goal', JSON.stringify(goal));
+                setShowGoalModal(false);
+            };
+            
+            // Goal progress calculation
+            const goalProgress = Math.min((totalMoney / goal.amount) * 100, 100);
+            const yearsToGoal = goal.targetAge - age;
+            
+            // Dark mode toggle
+            useEffect(() => {
+                document.body.classList.toggle('light-mode', !darkMode);
+            }, [darkMode]);
+            
+            // Deposit calculator projections
+            const depositProjections = {
+                chase: depositAmount,
+                savings: depositAmount * Math.pow(1.01, 12),
+                cd: depositAmount * Math.pow(1.05, 12),
+                roth: depositAmount * Math.pow(1.25, 12)
+            };
+
+            return (
+                <div className={`min-h-screen ${darkMode ? 'bg-slate-900' : 'bg-slate-100'} text-white font-sans pb-20 transition-colors`}>
+                    {/* Toast */}
+                    {toast && <Toast message={toast} onClose={() => setToast(null)} />}
+                    
+                    {/* Header */}
+                    <header className={`${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'} border-b sticky top-0 z-10 transition-colors`}>
+                        <div className="max-w-md mx-auto px-4 h-16 flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                                <img
+                                    src="taitt_fin_horizontal_banner.png"
+                                    alt="Taitt Fin"
+                                    className="h-8 w-auto object-contain"
+                                    onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                                />
+                                <span className={`font-bold text-lg tracking-tight ${darkMode ? 'text-white' : 'text-slate-900'}`}>Ezra's Money Machine</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                {/* Badges */}
+                                <div className="flex gap-1 mr-2">
+                                    <Badge name="Time Traveler" emoji="⏰" description="Used the time machine" unlocked={badges.timeTravel} />
+                                    <Badge name="$10K Club" emoji="💰" description="Reached $10,000" unlocked={badges.tenK} />
+                                    <Badge name="Money Expert" emoji="🎓" description="Learned all coin rules" unlocked={badges.coinRules} />
+                                    <Badge name="Quiz Master" emoji="🏆" description="Passed the money quiz" unlocked={badges.quiz} />
+                                </div>
+                                {/* Theme toggle */}
+                                <button
+                                    onClick={() => setDarkMode(!darkMode)}
+                                    className={`p-2 rounded-full ${darkMode ? 'bg-slate-800 hover:bg-slate-700' : 'bg-slate-200 hover:bg-slate-300'} transition-colors`}
+                                >
+                                    {darkMode ? '☀️' : '🌙'}
+                                </button>
+                                {/* Sound toggle */}
+                                <button
+                                    onClick={() => setSoundEnabled(!soundEnabled)}
+                                    className={`p-2 rounded-full ${darkMode ? 'bg-slate-800 hover:bg-slate-700' : 'bg-slate-200 hover:bg-slate-300'} transition-colors`}
+                                >
+                                    {soundEnabled ? '🔊' : '🔇'}
+                                </button>
+                            </div>
+                        </div>
+                    </header>
+
+                    <main className="max-w-md mx-auto px-4 py-6 space-y-6">
+                        {/* Tab Navigation */}
+                        <div className={`grid grid-cols-4 gap-1 ${darkMode ? 'bg-slate-800' : 'bg-slate-200'} p-1 rounded-xl`}>
+                            {['timeMachine', 'chart', 'coinRules', 'more'].map(tab => (
+                                <button
+                                    key={tab}
+                                    onClick={() => {
+                                        setActiveTab(tab);
+                                        if (tab === 'coinRules' && !badges.coinRules) {
+                                            setTimeout(() => unlockBadge('coinRules'), 2000);
+                                        }
+                                    }}
+                                    className={`py-2 rounded-lg text-xs font-bold transition-all ${
+                                        activeTab === tab 
+                                            ? 'bg-indigo-600 text-white shadow-lg' 
+                                            : `${darkMode ? 'text-slate-400 hover:text-white' : 'text-slate-600 hover:text-slate-900'}`
+                                    }`}
+                                >
+                                    {tab === 'timeMachine' ? '🚀 Time' : tab === 'chart' ? '📊 Chart' : tab === 'coinRules' ? '🪙 Rules' : '⚙️ More'}
+                                </button>
+                            ))}
+                        </div>
+
+                        {/* COIN RULES TAB */}
+                        {activeTab === 'coinRules' && (
+                            <div className="animate-in">
+                                <h2 className={`text-2xl font-bold mb-2 text-center ${darkMode ? 'text-white' : 'text-slate-900'}`}>How Your Money Grows</h2>
+                                <p className={`${darkMode ? 'text-slate-400' : 'text-slate-600'} text-center mb-6 text-sm`}>Every year, your money makes "baby money." The rule depends on where the money lives!</p>
+
+                                <CoinRule percentage={0} coinName="The Zero" description="Checking Account. The money just sleeps. It doesn't grow money." emoji="😴" value="Nothing (0¢)" coinColor="bg-slate-600 text-slate-400" />
+                                <CoinRule percentage={1} coinName="The Penny" description="Savings Account. Every dollar gives you a tiny penny." emoji="🥉" value="Penny (1¢)" coinColor="bg-orange-700 text-orange-200 border-2 border-orange-600" />
+                                <CoinRule percentage={5} coinName="The Nickel" description="Trax CD. Now we are talking! A shiny nickel." emoji="🥈" value="Nickel (5¢)" coinColor="bg-slate-300 text-slate-600 border-2 border-slate-400" />
+                                <CoinRule percentage={25} coinName="The Quarter" description="Roth IRA. This is the magic machine! Big quarters!" emoji="🚀" value="Quarter (25¢)" coinColor="bg-yellow-400 text-yellow-900 border-4 border-yellow-200" />
+                            </div>
+                        )}
+
+                        {/* CHART TAB */}
+                        {activeTab === 'chart' && (
+                            <div className="animate-in space-y-4">
+                                <h2 className={`text-xl font-bold text-center ${darkMode ? 'text-white' : 'text-slate-900'}`}>📊 Growth Comparison</h2>
+                                <Card>
+                                    <GrowthChart monthlyContribution={monthlyContribution} />
+                                </Card>
+                                
+                                {/* Monthly Contribution Slider */}
+                                <Card>
+                                    <div className="flex items-center justify-between mb-2">
+                                        <span className={`text-sm font-bold ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>💵 Monthly Savings</span>
+                                        <span className="text-yellow-400 font-bold">${monthlyContribution}/mo</span>
+                                    </div>
+                                    <input
+                                        type="range"
+                                        min="0"
+                                        max="100"
+                                        step="5"
+                                        value={monthlyContribution}
+                                        onChange={(e) => setMonthlyContribution(parseInt(e.target.value))}
+                                        className="w-full h-3 bg-slate-700 rounded-lg appearance-none cursor-pointer slider-thumb"
+                                    />
+                                    <p className="text-xs text-slate-500 mt-2">Add your allowance to see how saving regularly supercharges growth!</p>
+                                </Card>
+                            </div>
+                        )}
+
+                        {/* MORE TAB */}
+                        {activeTab === 'more' && (
+                            <div className="animate-in space-y-4">
+                                <h2 className={`text-xl font-bold text-center ${darkMode ? 'text-white' : 'text-slate-900'}`}>⚙️ More Features</h2>
+                                
+                                {/* Goal Card */}
+                                <Card>
+                                    <div className="flex justify-between items-center mb-3">
+                                        <h3 className="font-bold text-lg">🎯 My Goal</h3>
+                                        <button onClick={() => setShowGoalModal(true)} className="text-xs bg-slate-700 hover:bg-slate-600 px-3 py-1 rounded-full">Edit</button>
+                                    </div>
+                                    <p className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-600'} mb-2`}>{goal.description} by Age {goal.targetAge}</p>
+                                    <div className="flex justify-between text-sm mb-1">
+                                        <span>Progress to ${goal.amount.toLocaleString()}</span>
+                                        <span className="text-yellow-400">{goalProgress.toFixed(1)}%</span>
+                                    </div>
+                                    <div className="h-4 bg-slate-700 rounded-full overflow-hidden">
+                                        <div className="h-full bg-gradient-to-r from-green-500 to-emerald-400 transition-all" style={{width: `${goalProgress}%`}}></div>
+                                    </div>
+                                    {yearsToGoal > 0 && totalMoney < goal.amount && (
+                                        <p className="text-xs text-slate-500 mt-2">
+                                            {yearsToGoal} years to go! Keep saving! 💪
+                                        </p>
+                                    )}
+                                    {totalMoney >= goal.amount && (
+                                        <p className="text-xs text-green-400 mt-2 font-bold">
+                                            🎉 Goal achieved! You did it!
+                                        </p>
+                                    )}
+                                </Card>
+                                
+                                {/* Action Buttons */}
+                                <div className="grid grid-cols-2 gap-3">
+                                    <button
+                                        onClick={() => setShowDepositCalc(true)}
+                                        className="p-4 bg-gradient-to-r from-purple-600 to-indigo-600 rounded-xl font-bold hover:from-purple-500 hover:to-indigo-500 transition-all"
+                                    >
+                                        🔮 What If Calculator
+                                    </button>
+                                    <button
+                                        onClick={() => setShowQuiz(true)}
+                                        className="p-4 bg-gradient-to-r from-orange-600 to-red-600 rounded-xl font-bold hover:from-orange-500 hover:to-red-500 transition-all"
+                                    >
+                                        🧠 Money Quiz
+                                    </button>
+                                </div>
+                                
+                                <button
+                                    onClick={() => setShowParentDashboard(true)}
+                                    className="w-full p-4 bg-slate-700 hover:bg-slate-600 rounded-xl font-bold transition-colors"
+                                >
+                                    👨‍👩‍👦 Parent Dashboard
+                                </button>
+                            </div>
+                        )}
+
+                        {/* TIME MACHINE TAB */}
+                        {activeTab === 'timeMachine' && (
+                            <div className="space-y-6">
+                                <Card className="bg-gradient-to-b from-indigo-900 to-slate-900 border-indigo-500/30">
+                                    <div className="flex items-center justify-between mb-4">
+                                        <h3 className="font-bold text-indigo-300 flex items-center gap-2">
+                                            ⏰ Time Machine
+                                        </h3>
+                                        <span className="text-xs bg-indigo-500/20 text-indigo-300 px-2 py-1 rounded">Drag to grow!</span>
+                                    </div>
+
+                                    <div className="relative pt-6 pb-2">
+                                        <input
+                                            type="range" min="6" max="18" step="1"
+                                            value={age}
+                                            onChange={(e) => handleAgeChange(parseInt(e.target.value))}
+                                            className="w-full h-4 bg-slate-700 rounded-lg appearance-none cursor-pointer slider-thumb"
+                                        />
+                                        <div className="flex justify-between mt-2 text-xs font-mono text-slate-400">
+                                            <span>Age 6</span><span>Age 12</span><span>Age 18</span>
+                                        </div>
+                                        <div className="mt-4 text-center">
+                                            <span className="text-4xl font-black text-white drop-shadow-lg">Age {age}</span>
+                                            <div className="text-indigo-400 text-sm font-bold">
+                                                {yearsPassed === 0 ? "Today" : `${yearsPassed} years later`}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </Card>
+
+                                <div className="text-center py-4">
+                                    <div className={`${darkMode ? 'text-slate-400' : 'text-slate-600'} text-sm uppercase tracking-wider font-bold mb-1`}>Total Wealth</div>
+                                    <div className="text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-green-400 to-emerald-600 tracking-tight">
+                                        <AnimatedNumber value={totalMoney} />
+                                    </div>
+                                    {yearsPassed > 0 && (
+                                        <div className="inline-flex items-center gap-1 bg-green-900/30 text-green-400 px-3 py-1 rounded-full text-sm font-bold mt-2 border border-green-800">
+                                            📈 You made +<AnimatedNumber value={profit} /> for doing nothing!
+                                        </div>
+                                    )}
+                                </div>
+
+                                <div className="grid gap-4">
+                                    {/* Chase */}
+                                    <div className={`${darkMode ? 'bg-slate-800' : 'bg-white'} p-4 rounded-xl border-l-4 border-slate-500 flex items-center gap-4 transition-colors`}>
+                                        <div className="w-10 h-10 bg-slate-700 rounded-full flex items-center justify-center text-xl">🐷</div>
+                                        <div className="flex-1">
+                                            <div className="flex justify-between font-bold">
+                                                <span className={darkMode ? 'text-slate-300' : 'text-slate-700'}>Chase (0%)</span>
+                                                <span className="text-slate-400"><AnimatedNumber value={currentValues.chase} /></span>
+                                            </div>
+                                            <div className="h-2 bg-slate-700 rounded-full mt-2 overflow-hidden">
+                                                <div className="h-full bg-slate-500" style={{width: `${pct(currentValues.chase)}%`}}></div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Savings */}
+                                    <div className={`${darkMode ? 'bg-slate-800' : 'bg-white'} p-4 rounded-xl border-l-4 border-orange-500 flex items-center gap-4 transition-colors`}>
+                                        <div className="w-10 h-10 bg-orange-900/50 rounded-full flex items-center justify-center text-xl">🌱</div>
+                                        <div className="flex-1">
+                                            <div className="flex justify-between font-bold">
+                                                <span className="text-orange-200">Savings (1%)</span>
+                                                <span className="text-orange-400"><AnimatedNumber value={currentValues.savings} /></span>
+                                            </div>
+                                            <div className="h-2 bg-slate-700 rounded-full mt-2 overflow-hidden">
+                                                <div className="h-full bg-orange-500 transition-all duration-300" style={{width: `${pct(currentValues.savings)}%`}}></div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* CD */}
+                                    <div className={`${darkMode ? 'bg-slate-800' : 'bg-white'} p-4 rounded-xl border-l-4 border-blue-500 flex items-center gap-4 transition-colors`}>
+                                        <div className="w-10 h-10 bg-blue-900/50 rounded-full flex items-center justify-center text-xl">🔒</div>
+                                        <div className="flex-1">
+                                            <div className="flex justify-between font-bold">
+                                                <span className="text-blue-200">Trax CD (5%)</span>
+                                                <span className="text-blue-400"><AnimatedNumber value={currentValues.cd} /></span>
+                                            </div>
+                                            <div className="h-2 bg-slate-700 rounded-full mt-2 overflow-hidden">
+                                                <div className="h-full bg-blue-500 transition-all duration-300" style={{width: `${pct(currentValues.cd)}%`}}></div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Roth IRA */}
+                                    <div className="relative bg-gradient-to-r from-indigo-900 to-purple-900 p-4 rounded-xl border border-indigo-500/50 shadow-lg shadow-indigo-900/50 overflow-hidden">
+                                        <div className="relative z-10 flex items-center gap-4">
+                                            <div className="w-10 h-10 bg-yellow-400 rounded-full flex items-center justify-center text-xl shadow-lg shadow-yellow-400/50 animate-pulse">🚀</div>
+                                            <div className="flex-1">
+                                                <div className="flex justify-between font-bold items-center">
+                                                    <span className="text-white flex items-center gap-1">
+                                                        Roth IRA (25%)
+                                                        <button onClick={() => setShowRothInfo(true)} className="text-indigo-400 hover:text-indigo-300">ℹ️</button>
+                                                    </span>
+                                                    <span className="text-2xl text-yellow-300"><AnimatedNumber value={currentValues.roth} /></span>
+                                                </div>
+                                                <div className="h-3 bg-slate-900/50 rounded-full mt-2 overflow-hidden border border-white/10">
+                                                    <div className="h-full bg-gradient-to-r from-yellow-400 to-yellow-600 transition-all" style={{width: `${pct(currentValues.roth)}%`}}></div>
+                                                </div>
+                                                <div className="text-[10px] text-indigo-200 mt-2 flex items-center gap-1 font-bold">⚡ ROCKET MONEY! <span className="ml-1 text-xs text-yellow-200">Big growth</span></div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        <footer className={`text-center mt-10 ${darkMode ? 'text-slate-600' : 'text-slate-400'} text-xs`}>
+                            <p>Created by Taitt Fin for Ezra</p>
+                        </footer>
+                    </main>
+
+                    {/* MODALS */}
+                    
+                    {/* Roth Info Modal */}
+                    <Modal isOpen={showRothInfo} onClose={() => setShowRothInfo(false)} title="🚀 Why Does the Roth Grow So Fast?">
+                        <div className="space-y-4 text-slate-300">
+                            <p>The Roth IRA is invested in the <strong className="text-yellow-400">stock market</strong> — which means your money buys tiny pieces of real companies!</p>
+                            <p>Think of it like planting a seed in magical soil. While a regular savings account is like planting in regular dirt (slow growth), the stock market is like super-fertilized soil where plants can grow HUGE! 🌱🌳</p>
+                            <p>The 25% is an <em>average</em> — some years it grows more, some less. But over many years, it tends to be the best grower!</p>
+                            <div className="bg-yellow-400/10 border border-yellow-400/30 rounded-lg p-3 text-sm">
+                                <strong className="text-yellow-400">Pro Tip:</strong> The secret superpower is that you don't pay taxes on this money when you're older! That's why it's called a <em>Roth</em> IRA.
+                            </div>
+                        </div>
+                    </Modal>
+                    
+                    {/* Deposit Calculator Modal */}
+                    <Modal isOpen={showDepositCalc} onClose={() => setShowDepositCalc(false)} title="🔮 What If Calculator">
+                        <div className="space-y-4">
+                            <p className="text-slate-400 text-sm">See what happens if you deposit money into different accounts!</p>
+                            <div className="flex items-center gap-3">
+                                <span className="text-slate-300">Deposit:</span>
+                                <input
+                                    type="number"
+                                    value={depositAmount}
+                                    onChange={(e) => setDepositAmount(parseInt(e.target.value) || 0)}
+                                    className="flex-1 p-2 rounded-lg bg-slate-700 border border-slate-600 text-white text-lg font-bold"
+                                />
+                            </div>
+                            <p className="text-sm text-slate-400">After 12 years, that ${depositAmount} would become:</p>
+                            <div className="space-y-2">
+                                <div className="flex justify-between p-3 bg-slate-700/50 rounded-lg">
+                                    <span>Chase (0%)</span>
+                                    <span className="text-slate-400">${depositProjections.chase.toFixed(2)}</span>
+                                </div>
+                                <div className="flex justify-between p-3 bg-orange-900/30 rounded-lg border border-orange-800">
+                                    <span>Savings (1%)</span>
+                                    <span className="text-orange-400">${depositProjections.savings.toFixed(2)}</span>
+                                </div>
+                                <div className="flex justify-between p-3 bg-blue-900/30 rounded-lg border border-blue-800">
+                                    <span>CD (5%)</span>
+                                    <span className="text-blue-400">${depositProjections.cd.toFixed(2)}</span>
+                                </div>
+                                <div className="flex justify-between p-3 bg-gradient-to-r from-indigo-900 to-purple-900 rounded-lg border border-yellow-500">
+                                    <span className="font-bold">Roth IRA (25%)</span>
+                                    <span className="text-yellow-400 font-bold text-lg">${depositProjections.roth.toFixed(2)}</span>
+                                </div>
+                            </div>
+                            <p className="text-xs text-center text-yellow-400">
+                                🚀 The Roth would turn ${depositAmount} into ${depositProjections.roth.toFixed(2)} — that's {((depositProjections.roth / depositAmount - 1) * 100).toFixed(0)}% more!
+                            </p>
+                        </div>
+                    </Modal>
+                    
+                    {/* Quiz Modal */}
+                    <Modal isOpen={showQuiz} onClose={() => setShowQuiz(false)} title="🧠 Money Quiz">
+                        <QuizMode onComplete={() => {}} onUnlockBadge={unlockBadge} />
+                    </Modal>
+                    
+                    {/* Parent Dashboard Modal */}
+                    <Modal isOpen={showParentDashboard} onClose={() => setShowParentDashboard(false)} title="👨‍👩‍👦 Parent Dashboard">
+                        <ParentDashboard balances={balances} onUpdateBalances={handleUpdateBalances} onClose={() => setShowParentDashboard(false)} />
+                    </Modal>
+                    
+                    {/* Goal Edit Modal */}
+                    <Modal isOpen={showGoalModal} onClose={() => setShowGoalModal(false)} title="🎯 Set Your Goal">
+                        <div className="space-y-4">
+                            <div>
+                                <label className="block text-sm mb-1 text-slate-400">What are you saving for?</label>
+                                <input
+                                    type="text"
+                                    value={goal.description}
+                                    onChange={(e) => setGoal({...goal, description: e.target.value})}
+                                    className="w-full p-2 rounded-lg bg-slate-700 border border-slate-600 text-white"
+                                    placeholder="e.g., First Car, College, Laptop"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm mb-1 text-slate-400">How much do you need?</label>
+                                <input
+                                    type="number"
+                                    value={goal.amount}
+                                    onChange={(e) => setGoal({...goal, amount: parseInt(e.target.value) || 0})}
+                                    className="w-full p-2 rounded-lg bg-slate-700 border border-slate-600 text-white"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm mb-1 text-slate-400">By what age?</label>
+                                <input
+                                    type="number"
+                                    min="6"
+                                    max="25"
+                                    value={goal.targetAge}
+                                    onChange={(e) => setGoal({...goal, targetAge: parseInt(e.target.value) || 16})}
+                                    className="w-full p-2 rounded-lg bg-slate-700 border border-slate-600 text-white"
+                                />
+                            </div>
+                            <button onClick={handleSaveGoal} className="w-full py-3 bg-green-600 hover:bg-green-500 rounded-lg font-bold transition-colors">
+                                💾 Save Goal
+                            </button>
+                        </div>
+                    </Modal>
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<EzraMoneyApp />);
+    </script>
+</body>
+</html>
