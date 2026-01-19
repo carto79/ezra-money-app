@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -37,8 +38,17 @@
     </script>
 
     <style>
-        body { background-color: #0f172a; color: white; transition: background-color 0.3s, color 0.3s; }
-        body.light-mode { background-color: #f1f5f9; color: #1e293b; }
+        body {
+            background-color: #0f172a;
+            color: white;
+            transition: background-color 0.3s, color 0.3s;
+        }
+
+        body.light-mode {
+            background-color: #f1f5f9;
+            color: #1e293b;
+        }
+
         .slider-thumb::-webkit-slider-thumb {
             -webkit-appearance: none;
             appearance: none;
@@ -49,37 +59,72 @@
             border-radius: 50%;
             box-shadow: 0 0 10px rgba(251, 191, 36, 0.5);
         }
+
         @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(10px); }
-            to { opacity: 1; transform: translateY(0); }
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
         }
+
         @keyframes countUp {
-            from { transform: scale(1.1); }
-            to { transform: scale(1); }
+            from {
+                transform: scale(1.1);
+            }
+
+            to {
+                transform: scale(1);
+            }
         }
+
         .animate-in {
             animation: fadeIn 0.5s ease-out forwards;
         }
+
         .animate-count {
             animation: countUp 0.3s ease-out;
         }
+
         @keyframes pulse-glow {
-            0%, 100% { box-shadow: 0 0 5px rgba(251, 191, 36, 0.5); }
-            50% { box-shadow: 0 0 20px rgba(251, 191, 36, 0.8); }
+
+            0%,
+            100% {
+                box-shadow: 0 0 5px rgba(251, 191, 36, 0.5);
+            }
+
+            50% {
+                box-shadow: 0 0 20px rgba(251, 191, 36, 0.8);
+            }
         }
-        .badge-locked { filter: grayscale(100%); opacity: 0.4; }
+
+        .badge-locked {
+            filter: grayscale(100%);
+            opacity: 0.4;
+        }
+
         .modal-backdrop {
             background: rgba(0, 0, 0, 0.7);
             backdrop-filter: blur(4px);
         }
+
         .toast {
             animation: fadeIn 0.3s ease-out, fadeOut 0.3s ease-out 2.7s forwards;
         }
+
         @keyframes fadeOut {
-            to { opacity: 0; transform: translateY(-10px); }
+            to {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
         }
     </style>
 </head>
+
 <body>
     <div id="root"></div>
 
@@ -89,7 +134,7 @@
         // ============ SOUND EFFECTS ============
         const useSounds = (enabled) => {
             const audioContext = useRef(null);
-            
+
             const playSound = useCallback((type) => {
                 if (!enabled) return;
                 try {
@@ -101,7 +146,7 @@
                     const gainNode = ctx.createGain();
                     oscillator.connect(gainNode);
                     gainNode.connect(ctx.destination);
-                    
+
                     if (type === 'coin') {
                         oscillator.frequency.setValueAtTime(800, ctx.currentTime);
                         oscillator.frequency.exponentialRampToValueAtTime(1200, ctx.currentTime + 0.1);
@@ -132,7 +177,7 @@
                     console.log('Sound not available');
                 }
             }, [enabled]);
-            
+
             return { playSound };
         };
 
@@ -141,30 +186,30 @@
             const [displayValue, setDisplayValue] = useState(value);
             const previousValue = useRef(value);
             const animationRef = useRef(null);
-            
+
             useEffect(() => {
                 const startValue = previousValue.current;
                 const endValue = value;
                 const startTime = performance.now();
-                
+
                 const animate = (currentTime) => {
                     const elapsed = currentTime - startTime;
                     const progress = Math.min(elapsed / duration, 1);
                     const easeOut = 1 - Math.pow(1 - progress, 3);
                     const currentValue = startValue + (endValue - startValue) * easeOut;
                     setDisplayValue(currentValue);
-                    
+
                     if (progress < 1) {
                         animationRef.current = requestAnimationFrame(animate);
                     } else {
                         previousValue.current = endValue;
                     }
                 };
-                
+
                 animationRef.current = requestAnimationFrame(animate);
                 return () => cancelAnimationFrame(animationRef.current);
             }, [value, duration]);
-            
+
             return <span className="animate-count">{prefix}{displayValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>;
         };
 
@@ -174,7 +219,7 @@
                 const timer = setTimeout(onClose, 3000);
                 return () => clearTimeout(timer);
             }, [onClose]);
-            
+
             return (
                 <div className="fixed top-20 left-1/2 transform -translate-x-1/2 z-50 toast">
                     <div className="bg-gradient-to-r from-yellow-400 to-orange-500 text-slate-900 px-6 py-3 rounded-full font-bold shadow-lg flex items-center gap-2">
@@ -247,13 +292,13 @@
         const GrowthChart = ({ monthlyContribution = 0 }) => {
             const chartRef = useRef(null);
             const chartInstance = useRef(null);
-            
-            const initialBalances = { chase: 134.01, savings: 1202.46, cd: 520.00, roth: 1081.64 };
-            
+
+            const initialBalances = { checking: 134.01, savings: 702.46, cd: 520.00, brokerage: 580.00, college: 17388.70, roth: 1081.64 };
+
             useEffect(() => {
                 if (!chartRef.current) return;
-                
-                const ages = Array.from({length: 13}, (_, i) => i + 6);
+
+                const ages = Array.from({ length: 13 }, (_, i) => i + 6);
                 const generateData = (initial, rate) => {
                     return ages.map((age, i) => {
                         let total = initial * Math.pow(1 + rate, i);
@@ -266,19 +311,21 @@
                         return total;
                     });
                 };
-                
+
                 if (chartInstance.current) {
                     chartInstance.current.destroy();
                 }
-                
+
                 chartInstance.current = new Chart(chartRef.current, {
                     type: 'line',
                     data: {
                         labels: ages.map(a => `Age ${a}`),
                         datasets: [
-                            { label: 'Chase (0%)', data: generateData(initialBalances.chase, 0), borderColor: '#64748b', backgroundColor: 'rgba(100, 116, 139, 0.1)', tension: 0.3, fill: false },
+                            { label: 'Checking (0%)', data: generateData(initialBalances.checking, 0), borderColor: '#64748b', backgroundColor: 'rgba(100, 116, 139, 0.1)', tension: 0.3, fill: false },
                             { label: 'Savings (1%)', data: generateData(initialBalances.savings, 0.01), borderColor: '#f97316', backgroundColor: 'rgba(249, 115, 22, 0.1)', tension: 0.3, fill: false },
                             { label: 'CD (5%)', data: generateData(initialBalances.cd, 0.05), borderColor: '#3b82f6', backgroundColor: 'rgba(59, 130, 246, 0.1)', tension: 0.3, fill: false },
+                            { label: 'Stocks (10%)', data: generateData(initialBalances.brokerage, 0.10), borderColor: '#6366f1', backgroundColor: 'rgba(99, 102, 241, 0.1)', tension: 0.3, fill: false },
+                            { label: '529 College (10%)', data: generateData(initialBalances.college, 0.10), borderColor: '#14b8a6', backgroundColor: 'rgba(20, 184, 166, 0.1)', tension: 0.3, fill: false },
                             { label: 'Roth IRA (25%)', data: generateData(initialBalances.roth, 0.25), borderColor: '#fbbf24', backgroundColor: 'rgba(251, 191, 36, 0.1)', tension: 0.3, fill: true }
                         ]
                     },
@@ -296,10 +343,10 @@
                         interaction: { mode: 'nearest', axis: 'x', intersect: false }
                     }
                 });
-                
+
                 return () => chartInstance.current?.destroy();
             }, [monthlyContribution]);
-            
+
             return <div className="h-64"><canvas ref={chartRef}></canvas></div>;
         };
 
@@ -309,7 +356,7 @@
             const [score, setScore] = useState(0);
             const [showResult, setShowResult] = useState(false);
             const [selectedAnswer, setSelectedAnswer] = useState(null);
-            
+
             const questions = [
                 { q: "Which account grows your money the FASTEST?", options: ["Chase Checking", "Savings Account", "Roth IRA", "Under your mattress"], correct: 2 },
                 { q: "What does 5% interest mean?", options: ["You lose 5 cents per dollar", "You get 5 cents per dollar each year", "You pay $5 per month", "Your money stays the same"], correct: 1 },
@@ -317,7 +364,7 @@
                 { q: "What happens to money in a checking account (0%)?", options: ["It doubles every year", "It grows slowly", "It stays the same", "It disappears"], correct: 2 },
                 { q: "If you save $10 every month, what happens over time?", options: ["Nothing special", "Your money grows even more!", "You lose money", "The bank takes it"], correct: 1 }
             ];
-            
+
             const handleAnswer = (index) => {
                 setSelectedAnswer(index);
                 setTimeout(() => {
@@ -336,7 +383,7 @@
                     }
                 }, 1000);
             };
-            
+
             if (showResult) {
                 const passed = score >= 3;
                 return (
@@ -348,7 +395,7 @@
                     </div>
                 );
             }
-            
+
             return (
                 <div className="animate-in">
                     <div className="flex justify-between items-center mb-4">
@@ -356,7 +403,7 @@
                         <span className="text-sm text-yellow-400">Score: {score}</span>
                     </div>
                     <div className="bg-slate-700/50 rounded-full h-2 mb-6">
-                        <div className="bg-yellow-400 h-2 rounded-full transition-all" style={{width: `${((currentQuestion + 1) / questions.length) * 100}%`}}></div>
+                        <div className="bg-yellow-400 h-2 rounded-full transition-all" style={{ width: `${((currentQuestion + 1) / questions.length) * 100}%` }}></div>
                     </div>
                     <h3 className="text-xl font-bold mb-6">{questions[currentQuestion].q}</h3>
                     <div className="space-y-3">
@@ -364,17 +411,16 @@
                             <button
                                 key={i}
                                 onClick={() => selectedAnswer === null && handleAnswer(i)}
-                                className={`w-full p-4 rounded-xl text-left font-medium transition-all ${
-                                    selectedAnswer === null 
-                                        ? 'bg-slate-700 hover:bg-slate-600 border border-slate-600 hover:border-yellow-400' 
-                                        : selectedAnswer === i 
-                                            ? i === questions[currentQuestion].correct 
-                                                ? 'bg-green-600 border border-green-500' 
-                                                : 'bg-red-600 border border-red-500'
-                                            : i === questions[currentQuestion].correct 
-                                                ? 'bg-green-600/50 border border-green-500'
-                                                : 'bg-slate-700 border border-slate-600 opacity-50'
-                                }`}
+                                className={`w-full p-4 rounded-xl text-left font-medium transition-all ${selectedAnswer === null
+                                    ? 'bg-slate-700 hover:bg-slate-600 border border-slate-600 hover:border-yellow-400'
+                                    : selectedAnswer === i
+                                        ? i === questions[currentQuestion].correct
+                                            ? 'bg-green-600 border border-green-500'
+                                            : 'bg-red-600 border border-red-500'
+                                        : i === questions[currentQuestion].correct
+                                            ? 'bg-green-600/50 border border-green-500'
+                                            : 'bg-slate-700 border border-slate-600 opacity-50'
+                                    }`}
                             >
                                 {option}
                             </button>
@@ -390,16 +436,16 @@
             const [authenticated, setAuthenticated] = useState(false);
             const [newBalances, setNewBalances] = useState(balances);
             const PARENT_PIN = '1234';
-            
+
             const handleAuth = () => {
                 if (pin === PARENT_PIN) setAuthenticated(true);
             };
-            
+
             const handleSave = () => {
                 onUpdateBalances(newBalances);
                 onClose();
             };
-            
+
             if (!authenticated) {
                 return (
                     <div className="text-center">
@@ -419,7 +465,7 @@
                     </div>
                 );
             }
-            
+
             return (
                 <div className="space-y-4">
                     <p className="text-sm text-slate-400 mb-4">Update Ezra's real account balances:</p>
@@ -429,7 +475,7 @@
                             <input
                                 type="number"
                                 value={value}
-                                onChange={e => setNewBalances({...newBalances, [key]: parseFloat(e.target.value) || 0})}
+                                onChange={e => setNewBalances({ ...newBalances, [key]: parseFloat(e.target.value) || 0 })}
                                 className="flex-1 p-2 rounded-lg bg-slate-700 border border-slate-600 text-white"
                             />
                         </div>
@@ -460,29 +506,29 @@
                 return saved ? JSON.parse(saved) : { amount: 5000, description: 'First Car', targetAge: 16 };
             });
             const [showGoalModal, setShowGoalModal] = useState(false);
-            
+
             // Badges
             const [badges, setBadges] = useState(() => {
                 const saved = localStorage.getItem('ezra_badges');
                 return saved ? JSON.parse(saved) : { timeTravel: false, tenK: false, coinRules: false, quiz: false };
             });
-            
+
             // Balances (can be updated by parent)
             const [balances, setBalances] = useState(() => {
                 const saved = localStorage.getItem('ezra_balances');
-                return saved ? JSON.parse(saved) : { chase: 134.01, savings: 1202.46, cd: 520.00, roth: 1081.64 };
+                return saved ? JSON.parse(saved) : { checking: 134.01, savings: 702.46, cd: 520.00, brokerage: 580.00, college: 17388.70, roth: 1081.64 };
             });
-            
+
             // Milestones tracking
             const [celebratedMilestones, setCelebratedMilestones] = useState(() => {
                 const saved = localStorage.getItem('ezra_milestones');
                 return saved ? JSON.parse(saved) : [];
             });
-            
+
             const { playSound } = useSounds(soundEnabled);
-            
+
             const yearsPassed = Math.max(0, age - 6);
-            
+
             // Calculate values with optional monthly contribution
             const calculateGrowth = (initial, rate, years, monthly = 0) => {
                 let total = initial * Math.pow(1 + rate, years);
@@ -491,20 +537,22 @@
                 }
                 return total;
             };
-            
+
             const currentValues = {
-                chase: calculateGrowth(balances.chase, 0, yearsPassed, monthlyContribution),
-                savings: calculateGrowth(balances.savings, 0.01, yearsPassed, monthlyContribution),
-                cd: calculateGrowth(balances.cd, 0.05, yearsPassed, monthlyContribution),
-                roth: calculateGrowth(balances.roth, 0.25, yearsPassed, monthlyContribution)
+                checking: calculateGrowth(balances.checking || 0, 0, yearsPassed, monthlyContribution),
+                savings: calculateGrowth(balances.savings || 0, 0.01, yearsPassed, monthlyContribution),
+                cd: calculateGrowth(balances.cd || 0, 0.05, yearsPassed, monthlyContribution),
+                brokerage: calculateGrowth(balances.brokerage || 0, 0.10, yearsPassed, monthlyContribution),
+                college: calculateGrowth(balances.college || 0, 0.10, yearsPassed, monthlyContribution),
+                roth: calculateGrowth(balances.roth || 0, 0.25, yearsPassed, monthlyContribution)
             };
-            
+
             const totalMoney = Object.values(currentValues).reduce((a, b) => a + b, 0);
             const initialTotal = Object.values(balances).reduce((a, b) => a + b, 0);
             const profit = totalMoney - initialTotal;
-            
+
             const pct = (val) => totalMoney > 0 ? Math.round((val / totalMoney) * 100) : 0;
-            
+
             // Unlock badge helper
             const unlockBadge = useCallback((badgeName) => {
                 if (!badges[badgeName]) {
@@ -515,7 +563,7 @@
                     setToast(`🎖️ Badge Unlocked: ${badgeName === 'timeTravel' ? 'Time Traveler' : badgeName === 'tenK' ? '$10K Club' : badgeName === 'coinRules' ? 'Money Expert' : 'Quiz Master'}!`);
                 }
             }, [badges, playSound]);
-            
+
             // Check milestones
             useEffect(() => {
                 const milestones = [5000, 10000, 25000, 50000, 100000];
@@ -523,7 +571,7 @@
                     if (totalMoney >= milestone && !celebratedMilestones.includes(milestone)) {
                         confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
                         playSound('milestone');
-                        setToast(`🎉 Milestone: $${(milestone/1000).toFixed(0)}K reached!`);
+                        setToast(`🎉 Milestone: $${(milestone / 1000).toFixed(0)}K reached!`);
                         const newCelebrated = [...celebratedMilestones, milestone];
                         setCelebratedMilestones(newCelebrated);
                         localStorage.setItem('ezra_milestones', JSON.stringify(newCelebrated));
@@ -531,14 +579,14 @@
                     }
                 });
             }, [totalMoney, celebratedMilestones, playSound, unlockBadge]);
-            
+
             // Time travel badge
             useEffect(() => {
                 if (age > 6 && !badges.timeTravel) {
                     unlockBadge('timeTravel');
                 }
             }, [age, badges.timeTravel, unlockBadge]);
-            
+
             // Handle slider change with sound
             const handleAgeChange = (newAge) => {
                 if (newAge !== age) {
@@ -546,34 +594,36 @@
                 }
                 setAge(newAge);
             };
-            
+
             // Handle balance updates
             const handleUpdateBalances = (newBalances) => {
                 setBalances(newBalances);
                 localStorage.setItem('ezra_balances', JSON.stringify(newBalances));
                 localStorage.setItem('ezra_balances_updated', new Date().toISOString());
             };
-            
+
             // Handle goal save
             const handleSaveGoal = () => {
                 localStorage.setItem('ezra_goal', JSON.stringify(goal));
                 setShowGoalModal(false);
             };
-            
+
             // Goal progress calculation
             const goalProgress = Math.min((totalMoney / goal.amount) * 100, 100);
             const yearsToGoal = goal.targetAge - age;
-            
+
             // Dark mode toggle
             useEffect(() => {
                 document.body.classList.toggle('light-mode', !darkMode);
             }, [darkMode]);
-            
+
             // Deposit calculator projections
             const depositProjections = {
-                chase: depositAmount,
+                checking: depositAmount,
                 savings: depositAmount * Math.pow(1.01, 12),
                 cd: depositAmount * Math.pow(1.05, 12),
+                brokerage: depositAmount * Math.pow(1.10, 12),
+                college: depositAmount * Math.pow(1.10, 12),
                 roth: depositAmount * Math.pow(1.25, 12)
             };
 
@@ -581,7 +631,7 @@
                 <div className={`min-h-screen ${darkMode ? 'bg-slate-900' : 'bg-slate-100'} text-white font-sans pb-20 transition-colors`}>
                     {/* Toast */}
                     {toast && <Toast message={toast} onClose={() => setToast(null)} />}
-                    
+
                     {/* Header */}
                     <header className={`${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'} border-b sticky top-0 z-10 transition-colors`}>
                         <div className="max-w-md mx-auto px-4 h-16 flex items-center justify-between">
@@ -632,11 +682,10 @@
                                             setTimeout(() => unlockBadge('coinRules'), 2000);
                                         }
                                     }}
-                                    className={`py-2 rounded-lg text-xs font-bold transition-all ${
-                                        activeTab === tab 
-                                            ? 'bg-indigo-600 text-white shadow-lg' 
-                                            : `${darkMode ? 'text-slate-400 hover:text-white' : 'text-slate-600 hover:text-slate-900'}`
-                                    }`}
+                                    className={`py-2 rounded-lg text-xs font-bold transition-all ${activeTab === tab
+                                        ? 'bg-indigo-600 text-white shadow-lg'
+                                        : `${darkMode ? 'text-slate-400 hover:text-white' : 'text-slate-600 hover:text-slate-900'}`
+                                        }`}
                                 >
                                     {tab === 'timeMachine' ? '🚀 Time' : tab === 'chart' ? '📊 Chart' : tab === 'coinRules' ? '🪙 Rules' : '⚙️ More'}
                                 </button>
@@ -649,10 +698,11 @@
                                 <h2 className={`text-2xl font-bold mb-2 text-center ${darkMode ? 'text-white' : 'text-slate-900'}`}>How Your Money Grows</h2>
                                 <p className={`${darkMode ? 'text-slate-400' : 'text-slate-600'} text-center mb-6 text-sm`}>Every year, your money makes "baby money." The rule depends on where the money lives!</p>
 
-                                <CoinRule percentage={0} coinName="The Zero" description="Checking Account. The money just sleeps. It doesn't grow money." emoji="😴" value="Nothing (0¢)" coinColor="bg-slate-600 text-slate-400" />
-                                <CoinRule percentage={1} coinName="The Penny" description="Savings Account. Every dollar gives you a tiny penny." emoji="🥉" value="Penny (1¢)" coinColor="bg-orange-700 text-orange-200 border-2 border-orange-600" />
-                                <CoinRule percentage={5} coinName="The Nickel" description="Trax CD. Now we are talking! A shiny nickel." emoji="🥈" value="Nickel (5¢)" coinColor="bg-slate-300 text-slate-600 border-2 border-slate-400" />
-                                <CoinRule percentage={25} coinName="The Quarter" description="Roth IRA. This is the magic machine! Big quarters!" emoji="🚀" value="Quarter (25¢)" coinColor="bg-yellow-400 text-yellow-900 border-4 border-yellow-200" />
+                                <CoinRule percentage={0} coinName="The Zero" description="Checking Account." emoji="😴" value="Get Nothing (0¢)" coinColor="bg-slate-600 text-slate-400" />
+                                <CoinRule percentage={1} coinName="The Penny" description="Savings Account." emoji="🥉" value="Get a Penny (1¢)" coinColor="bg-orange-700 text-orange-200 border-2 border-orange-600" />
+                                <CoinRule percentage={5} coinName="The Nickel" description="CD." emoji="🥈" value="Get a Nickel (5¢)" coinColor="bg-slate-300 text-slate-600 border-2 border-slate-400" />
+                                <CoinRule percentage={10} coinName="The Dime" description="Stocks & 529." emoji="📈" value="Get a Dime (10¢)" coinColor="bg-indigo-500 text-indigo-100 border-2 border-indigo-400" />
+                                <CoinRule percentage={25} coinName="The Quarter" description="Roth IRA." emoji="🚀" value="Get a Quarter (25¢)" coinColor="bg-yellow-400 text-yellow-900 border-4 border-yellow-200" />
                             </div>
                         )}
 
@@ -663,7 +713,7 @@
                                 <Card>
                                     <GrowthChart monthlyContribution={monthlyContribution} />
                                 </Card>
-                                
+
                                 {/* Monthly Contribution Slider */}
                                 <Card>
                                     <div className="flex items-center justify-between mb-2">
@@ -688,7 +738,7 @@
                         {activeTab === 'more' && (
                             <div className="animate-in space-y-4">
                                 <h2 className={`text-xl font-bold text-center ${darkMode ? 'text-white' : 'text-slate-900'}`}>⚙️ More Features</h2>
-                                
+
                                 {/* Goal Card */}
                                 <Card>
                                     <div className="flex justify-between items-center mb-3">
@@ -701,7 +751,7 @@
                                         <span className="text-yellow-400">{goalProgress.toFixed(1)}%</span>
                                     </div>
                                     <div className="h-4 bg-slate-700 rounded-full overflow-hidden">
-                                        <div className="h-full bg-gradient-to-r from-green-500 to-emerald-400 transition-all" style={{width: `${goalProgress}%`}}></div>
+                                        <div className="h-full bg-gradient-to-r from-green-500 to-emerald-400 transition-all" style={{ width: `${goalProgress}%` }}></div>
                                     </div>
                                     {yearsToGoal > 0 && totalMoney < goal.amount && (
                                         <p className="text-xs text-slate-500 mt-2">
@@ -714,7 +764,7 @@
                                         </p>
                                     )}
                                 </Card>
-                                
+
                                 {/* Action Buttons */}
                                 <div className="grid grid-cols-2 gap-3">
                                     <button
@@ -730,7 +780,7 @@
                                         🧠 Money Quiz
                                     </button>
                                 </div>
-                                
+
                                 <button
                                     onClick={() => setShowParentDashboard(true)}
                                     className="w-full p-4 bg-slate-700 hover:bg-slate-600 rounded-xl font-bold transition-colors"
@@ -783,16 +833,16 @@
                                 </div>
 
                                 <div className="grid gap-4">
-                                    {/* Chase */}
+                                    {/* Checking */}
                                     <div className={`${darkMode ? 'bg-slate-800' : 'bg-white'} p-4 rounded-xl border-l-4 border-slate-500 flex items-center gap-4 transition-colors`}>
                                         <div className="w-10 h-10 bg-slate-700 rounded-full flex items-center justify-center text-xl">🐷</div>
                                         <div className="flex-1">
                                             <div className="flex justify-between font-bold">
-                                                <span className={darkMode ? 'text-slate-300' : 'text-slate-700'}>Chase (0%)</span>
-                                                <span className="text-slate-400"><AnimatedNumber value={currentValues.chase} /></span>
+                                                <span className={darkMode ? 'text-slate-300' : 'text-slate-700'}>Checking (0%)</span>
+                                                <span className="text-slate-400"><AnimatedNumber value={currentValues.checking} /></span>
                                             </div>
                                             <div className="h-2 bg-slate-700 rounded-full mt-2 overflow-hidden">
-                                                <div className="h-full bg-slate-500" style={{width: `${pct(currentValues.chase)}%`}}></div>
+                                                <div className="h-full bg-slate-500" style={{ width: `${pct(currentValues.checking)}%` }}></div>
                                             </div>
                                         </div>
                                     </div>
@@ -806,7 +856,7 @@
                                                 <span className="text-orange-400"><AnimatedNumber value={currentValues.savings} /></span>
                                             </div>
                                             <div className="h-2 bg-slate-700 rounded-full mt-2 overflow-hidden">
-                                                <div className="h-full bg-orange-500 transition-all duration-300" style={{width: `${pct(currentValues.savings)}%`}}></div>
+                                                <div className="h-full bg-orange-500 transition-all duration-300" style={{ width: `${pct(currentValues.savings)}%` }}></div>
                                             </div>
                                         </div>
                                     </div>
@@ -816,11 +866,39 @@
                                         <div className="w-10 h-10 bg-blue-900/50 rounded-full flex items-center justify-center text-xl">🔒</div>
                                         <div className="flex-1">
                                             <div className="flex justify-between font-bold">
-                                                <span className="text-blue-200">Trax CD (5%)</span>
+                                                <span className="text-blue-200">CD (5%)</span>
                                                 <span className="text-blue-400"><AnimatedNumber value={currentValues.cd} /></span>
                                             </div>
                                             <div className="h-2 bg-slate-700 rounded-full mt-2 overflow-hidden">
-                                                <div className="h-full bg-blue-500 transition-all duration-300" style={{width: `${pct(currentValues.cd)}%`}}></div>
+                                                <div className="h-full bg-blue-500 transition-all duration-300" style={{ width: `${pct(currentValues.cd)}%` }}></div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Brokerage / Stocks */}
+                                    <div className={`${darkMode ? 'bg-slate-800' : 'bg-white'} p-4 rounded-xl border-l-4 border-indigo-500 flex items-center gap-4 transition-colors`}>
+                                        <div className="w-10 h-10 bg-indigo-900/50 rounded-full flex items-center justify-center text-xl">📈</div>
+                                        <div className="flex-1">
+                                            <div className="flex justify-between font-bold">
+                                                <span className="text-indigo-200">Stocks (10%)</span>
+                                                <span className="text-indigo-400"><AnimatedNumber value={currentValues.brokerage} /></span>
+                                            </div>
+                                            <div className="h-2 bg-slate-700 rounded-full mt-2 overflow-hidden">
+                                                <div className="h-full bg-indigo-500 transition-all duration-300" style={{ width: `${pct(currentValues.brokerage)}%` }}></div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* 529 College Fund */}
+                                    <div className={`${darkMode ? 'bg-slate-800' : 'bg-white'} p-4 rounded-xl border-l-4 border-teal-500 flex items-center gap-4 transition-colors`}>
+                                        <div className="w-10 h-10 bg-teal-900/50 rounded-full flex items-center justify-center text-xl">🎓</div>
+                                        <div className="flex-1">
+                                            <div className="flex justify-between font-bold">
+                                                <span className="text-teal-200">529 College (10%)</span>
+                                                <span className="text-teal-400"><AnimatedNumber value={currentValues.college} /></span>
+                                            </div>
+                                            <div className="h-2 bg-slate-700 rounded-full mt-2 overflow-hidden">
+                                                <div className="h-full bg-teal-500 transition-all duration-300" style={{ width: `${pct(currentValues.college)}%` }}></div>
                                             </div>
                                         </div>
                                     </div>
@@ -838,7 +916,7 @@
                                                     <span className="text-2xl text-yellow-300"><AnimatedNumber value={currentValues.roth} /></span>
                                                 </div>
                                                 <div className="h-3 bg-slate-900/50 rounded-full mt-2 overflow-hidden border border-white/10">
-                                                    <div className="h-full bg-gradient-to-r from-yellow-400 to-yellow-600 transition-all" style={{width: `${pct(currentValues.roth)}%`}}></div>
+                                                    <div className="h-full bg-gradient-to-r from-yellow-400 to-yellow-600 transition-all" style={{ width: `${pct(currentValues.roth)}%` }}></div>
                                                 </div>
                                                 <div className="text-[10px] text-indigo-200 mt-2 flex items-center gap-1 font-bold">⚡ ROCKET MONEY! <span className="ml-1 text-xs text-yellow-200">Big growth</span></div>
                                             </div>
@@ -854,7 +932,7 @@
                     </main>
 
                     {/* MODALS */}
-                    
+
                     {/* Roth Info Modal */}
                     <Modal isOpen={showRothInfo} onClose={() => setShowRothInfo(false)} title="🚀 Why Does the Roth Grow So Fast?">
                         <div className="space-y-4 text-slate-300">
@@ -866,7 +944,7 @@
                             </div>
                         </div>
                     </Modal>
-                    
+
                     {/* Deposit Calculator Modal */}
                     <Modal isOpen={showDepositCalc} onClose={() => setShowDepositCalc(false)} title="🔮 What If Calculator">
                         <div className="space-y-4">
@@ -883,8 +961,8 @@
                             <p className="text-sm text-slate-400">After 12 years, that ${depositAmount} would become:</p>
                             <div className="space-y-2">
                                 <div className="flex justify-between p-3 bg-slate-700/50 rounded-lg">
-                                    <span>Chase (0%)</span>
-                                    <span className="text-slate-400">${depositProjections.chase.toFixed(2)}</span>
+                                    <span>Checking (0%)</span>
+                                    <span className="text-slate-400">${depositProjections.checking.toFixed(2)}</span>
                                 </div>
                                 <div className="flex justify-between p-3 bg-orange-900/30 rounded-lg border border-orange-800">
                                     <span>Savings (1%)</span>
@@ -893,6 +971,14 @@
                                 <div className="flex justify-between p-3 bg-blue-900/30 rounded-lg border border-blue-800">
                                     <span>CD (5%)</span>
                                     <span className="text-blue-400">${depositProjections.cd.toFixed(2)}</span>
+                                </div>
+                                <div className="flex justify-between p-3 bg-indigo-900/30 rounded-lg border border-indigo-800">
+                                    <span>Stocks (10%)</span>
+                                    <span className="text-indigo-400">${depositProjections.brokerage.toFixed(2)}</span>
+                                </div>
+                                <div className="flex justify-between p-3 bg-teal-900/30 rounded-lg border border-teal-800">
+                                    <span>529 College (10%)</span>
+                                    <span className="text-teal-400">${depositProjections.college.toFixed(2)}</span>
                                 </div>
                                 <div className="flex justify-between p-3 bg-gradient-to-r from-indigo-900 to-purple-900 rounded-lg border border-yellow-500">
                                     <span className="font-bold">Roth IRA (25%)</span>
@@ -904,17 +990,17 @@
                             </p>
                         </div>
                     </Modal>
-                    
+
                     {/* Quiz Modal */}
                     <Modal isOpen={showQuiz} onClose={() => setShowQuiz(false)} title="🧠 Money Quiz">
-                        <QuizMode onComplete={() => {}} onUnlockBadge={unlockBadge} />
+                        <QuizMode onComplete={() => { }} onUnlockBadge={unlockBadge} />
                     </Modal>
-                    
+
                     {/* Parent Dashboard Modal */}
                     <Modal isOpen={showParentDashboard} onClose={() => setShowParentDashboard(false)} title="👨‍👩‍👦 Parent Dashboard">
                         <ParentDashboard balances={balances} onUpdateBalances={handleUpdateBalances} onClose={() => setShowParentDashboard(false)} />
                     </Modal>
-                    
+
                     {/* Goal Edit Modal */}
                     <Modal isOpen={showGoalModal} onClose={() => setShowGoalModal(false)} title="🎯 Set Your Goal">
                         <div className="space-y-4">
@@ -923,7 +1009,7 @@
                                 <input
                                     type="text"
                                     value={goal.description}
-                                    onChange={(e) => setGoal({...goal, description: e.target.value})}
+                                    onChange={(e) => setGoal({ ...goal, description: e.target.value })}
                                     className="w-full p-2 rounded-lg bg-slate-700 border border-slate-600 text-white"
                                     placeholder="e.g., First Car, College, Laptop"
                                 />
@@ -933,7 +1019,7 @@
                                 <input
                                     type="number"
                                     value={goal.amount}
-                                    onChange={(e) => setGoal({...goal, amount: parseInt(e.target.value) || 0})}
+                                    onChange={(e) => setGoal({ ...goal, amount: parseInt(e.target.value) || 0 })}
                                     className="w-full p-2 rounded-lg bg-slate-700 border border-slate-600 text-white"
                                 />
                             </div>
@@ -944,7 +1030,7 @@
                                     min="6"
                                     max="25"
                                     value={goal.targetAge}
-                                    onChange={(e) => setGoal({...goal, targetAge: parseInt(e.target.value) || 16})}
+                                    onChange={(e) => setGoal({ ...goal, targetAge: parseInt(e.target.value) || 16 })}
                                     className="w-full p-2 rounded-lg bg-slate-700 border border-slate-600 text-white"
                                 />
                             </div>
@@ -961,4 +1047,5 @@
         root.render(<EzraMoneyApp />);
     </script>
 </body>
+
 </html>
