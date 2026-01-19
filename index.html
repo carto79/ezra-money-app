@@ -666,6 +666,22 @@
                                 >
                                     {soundEnabled ? '🔊' : '🔇'}
                                 </button>
+                                {/* Reset button */}
+                                <button
+                                    onClick={() => {
+                                        if (confirm('Reset all data to defaults? This will clear your badges, milestones, and custom balances.')) {
+                                            localStorage.removeItem('ezra_balances');
+                                            localStorage.removeItem('ezra_badges');
+                                            localStorage.removeItem('ezra_milestones');
+                                            localStorage.removeItem('ezra_goal');
+                                            window.location.reload();
+                                        }
+                                    }}
+                                    className={`p-2 rounded-full ${darkMode ? 'bg-slate-800 hover:bg-slate-700' : 'bg-slate-200 hover:bg-slate-300'} transition-colors`}
+                                    title="Reset all data"
+                                >
+                                    🔄
+                                </button>
                             </div>
                         </div>
                     </header>
