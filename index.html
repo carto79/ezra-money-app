@@ -795,14 +795,15 @@
 
                     {/* Header */}
                     <header className={`${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'} border-b sticky top-0 z-10 transition-colors`}>
-                        <div className="max-w-md mx-auto px-4 h-16 flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                                <div className="w-8 h-8 bg-gradient-to-tr from-yellow-400 to-orange-500 rounded-full flex items-center justify-center text-slate-900 font-bold text-sm">💰</div>
+                        <div className="max-w-md mx-auto px-4 py-2">
+                            {/* Title Row */}
+                            <div className="text-center mb-2">
                                 <span className={`font-bold text-lg tracking-tight ${darkMode ? 'text-white' : 'text-slate-900'}`}>Ezra's Money Machine</span>
                             </div>
-                            <div className="flex items-center gap-2">
+                            {/* Icons Row */}
+                            <div className="flex items-center justify-center gap-2 flex-wrap">
                                 {/* Badges */}
-                                <div className="flex gap-1 mr-2">
+                                <div className="flex gap-1">
                                     <Badge name="Time Traveler" emoji="⏰" description="Used the time machine" unlocked={badges.timeTravel} />
                                     <Badge name="$10K Club" emoji="💰" description="Reached $10,000" unlocked={badges.tenK} />
                                     <Badge name="Money Expert" emoji="🎓" description="Learned all coin rules" unlocked={badges.coinRules} />
@@ -835,6 +836,7 @@
                                             localStorage.removeItem('ezra_badges');
                                             localStorage.removeItem('ezra_milestones');
                                             localStorage.removeItem('ezra_goal');
+                                            localStorage.removeItem('ezra_streak');
                                             window.location.reload();
                                         }
                                     }}
