@@ -3,9 +3,20 @@
 
 <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <title>Ezra's Money Machine</title>
     <meta name="description" content="A financial learning tool for Ezra by Taitt Fin." />
+
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="manifest.json" />
+    <meta name="theme-color" content="#0f172a" />
+
+    <!-- iOS PWA Support -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Ezra's Money" />
+    <link rel="apple-touch-icon"
+        href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>💰</text></svg>" />
 
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -621,7 +632,7 @@
             // Badges
             const [badges, setBadges] = useState(() => {
                 const saved = localStorage.getItem('ezra_badges');
-                return saved ? JSON.parse(saved) : { timeTravel: false, tenK: false, coinRules: false, quiz: false };
+                return saved ? JSON.parse(saved) : { timeTravel: false, tenK: false, coinRules: false, quiz: false, weekStreak: false };
             });
 
             // Balances (can be updated by parent)
@@ -635,6 +646,43 @@
                 const saved = localStorage.getItem('ezra_milestones');
                 return saved ? JSON.parse(saved) : [];
             });
+
+            // NEW FEATURES STATE
+            const [showBirthdayCalc, setShowBirthdayCalc] = useState(false);
+            const [birthdayAmount, setBirthdayAmount] = useState(50);
+            const [showBuyOrSave, setShowBuyOrSave] = useState(false);
+            const [itemPrice, setItemPrice] = useState(50);
+            const [itemName, setItemName] = useState('Video Game');
+            const [showProgressReport, setShowProgressReport] = useState(false);
+            const [showMoneyStory, setShowMoneyStory] = useState(false);
+            const [storyPage, setStoryPage] = useState(0);
+
+            // Savings Streak
+            const [streak, setStreak] = useState(() => {
+                const saved = localStorage.getItem('ezra_streak');
+                if (saved) {
+                    const data = JSON.parse(saved);
+                    const lastVisit = new Date(data.lastVisit);
+                    const today = new Date();
+                    const diffDays = Math.floor((today - lastVisit) / (1000 * 60 * 60 * 24));
+                    if (diffDays === 0) return data; // Same day
+                    if (diffDays === 1) return { count: data.count + 1, lastVisit: today.toISOString() }; // Next day - continue streak
+                    return { count: 1, lastVisit: today.toISOString() }; // Streak broken
+                }
+                return { count: 1, lastVisit: new Date().toISOString() };
+            });
+
+            // Save streak on mount
+            useEffect(() => {
+                localStorage.setItem('ezra_streak', JSON.stringify(streak));
+                // Unlock streak badges
+                if (streak.count >= 7 && !badges.weekStreak) {
+                    const newBadges = { ...badges, weekStreak: true };
+                    setBadges(newBadges);
+                    localStorage.setItem('ezra_badges', JSON.stringify(newBadges));
+                    setToast('🔥 7-Day Streak Badge Unlocked!');
+                }
+            }, [streak]);
 
             const { playSound } = useSounds(soundEnabled);
 
@@ -762,6 +810,11 @@
                                     <Badge name="$10K Club" emoji="💰" description="Reached $10,000" unlocked={badges.tenK} />
                                     <Badge name="Money Expert" emoji="🎓" description="Learned all coin rules" unlocked={badges.coinRules} />
                                     <Badge name="Quiz Master" emoji="🏆" description="Passed the money quiz" unlocked={badges.quiz} />
+                                    <Badge name="7-Day Streak" emoji="🔥" description="Visited 7 days in a row" unlocked={badges.weekStreak} />
+                                </div>
+                                {/* Streak Counter */}
+                                <div className={`text-xs px-2 py-1 rounded-full ${streak.count >= 7 ? 'bg-orange-500 text-white' : darkMode ? 'bg-slate-800 text-orange-400' : 'bg-slate-200 text-orange-600'} font-bold`}>
+                                    🔥{streak.count}
                                 </div>
                                 {/* Theme toggle */}
                                 <button
@@ -905,6 +958,37 @@
                                         className="p-4 bg-gradient-to-r from-orange-600 to-red-600 rounded-xl font-bold hover:from-orange-500 hover:to-red-500 transition-all"
                                     >
                                         🧠 Money Quiz
+                                    </button>
+                                </div>
+
+                                {/* NEW Feature Buttons */}
+                                <div className="grid grid-cols-2 gap-3">
+                                    <button
+                                        onClick={() => setShowBirthdayCalc(true)}
+                                        className="p-4 bg-gradient-to-r from-pink-600 to-rose-600 rounded-xl font-bold hover:from-pink-500 hover:to-rose-500 transition-all"
+                                    >
+                                        🎂 Birthday Money
+                                    </button>
+                                    <button
+                                        onClick={() => setShowBuyOrSave(true)}
+                                        className="p-4 bg-gradient-to-r from-teal-600 to-cyan-600 rounded-xl font-bold hover:from-teal-500 hover:to-cyan-500 transition-all"
+                                    >
+                                        🎮 Buy or Save?
+                                    </button>
+                                </div>
+
+                                <div className="grid grid-cols-2 gap-3">
+                                    <button
+                                        onClick={() => setShowMoneyStory(true)}
+                                        className="p-4 bg-gradient-to-r from-amber-600 to-yellow-600 rounded-xl font-bold hover:from-amber-500 hover:to-yellow-500 transition-all"
+                                    >
+                                        📖 Money Story
+                                    </button>
+                                    <button
+                                        onClick={() => setShowProgressReport(true)}
+                                        className="p-4 bg-gradient-to-r from-green-600 to-emerald-600 rounded-xl font-bold hover:from-green-500 hover:to-emerald-500 transition-all"
+                                    >
+                                        📊 Progress Report
                                     </button>
                                 </div>
 
@@ -1164,6 +1248,220 @@
                             <button onClick={handleSaveGoal} className="w-full py-3 bg-green-600 hover:bg-green-500 rounded-lg font-bold transition-colors">
                                 💾 Save Goal
                             </button>
+                        </div>
+                    </Modal>
+
+                    {/* Birthday Money Calculator Modal */}
+                    <Modal isOpen={showBirthdayCalc} onClose={() => setShowBirthdayCalc(false)} title="🎂 Birthday Money Calculator">
+                        <div className="space-y-4">
+                            <div className="text-center mb-4">
+                                <div className="text-4xl mb-2">🎁</div>
+                                <p className="text-slate-400 text-sm">See what your birthday money could grow into!</p>
+                            </div>
+
+                            <div className="flex items-center gap-3">
+                                <span className="text-slate-400">Gift Amount:</span>
+                                <input
+                                    type="number"
+                                    value={birthdayAmount}
+                                    onChange={(e) => setBirthdayAmount(parseInt(e.target.value) || 0)}
+                                    className="flex-1 p-2 rounded-lg bg-slate-700 border border-slate-600 text-white text-lg font-bold text-center"
+                                />
+                            </div>
+
+                            <div className="bg-gradient-to-r from-indigo-900 to-purple-900 rounded-xl p-4 text-center">
+                                <p className="text-slate-300 text-sm mb-2">If you invest ${birthdayAmount} in stocks (10% return)...</p>
+                                <p className="text-slate-400 text-xs">By age 18 ({18 - age} years), it becomes:</p>
+                                <div className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-green-400 to-emerald-500 my-2">
+                                    ${(birthdayAmount * Math.pow(1.10, 18 - age)).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                </div>
+                                <p className="text-green-400 text-sm font-bold">
+                                    +${((birthdayAmount * Math.pow(1.10, 18 - age)) - birthdayAmount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} earned for doing nothing!
+                                </p>
+                            </div>
+
+                            <div className="text-center text-yellow-400 text-sm">
+                                🚀 That's the power of compound interest!
+                            </div>
+                        </div>
+                    </Modal>
+
+                    {/* Buy It or Save It Modal */}
+                    <Modal isOpen={showBuyOrSave} onClose={() => setShowBuyOrSave(false)} title="🎮 Buy It or Save It?">
+                        <div className="space-y-4">
+                            <p className="text-slate-400 text-sm text-center">
+                                What if you saved instead of buying? Let's see!
+                            </p>
+
+                            <div className="space-y-3">
+                                <div>
+                                    <label className="text-slate-400 text-sm">What do you want to buy?</label>
+                                    <input
+                                        type="text"
+                                        value={itemName}
+                                        onChange={(e) => setItemName(e.target.value)}
+                                        className="w-full p-2 rounded-lg bg-slate-700 border border-slate-600 text-white mt-1"
+                                        placeholder="e.g., Video Game, Toy, Candy"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-slate-400 text-sm">How much does it cost?</label>
+                                    <input
+                                        type="number"
+                                        value={itemPrice}
+                                        onChange={(e) => setItemPrice(parseInt(e.target.value) || 0)}
+                                        className="w-full p-2 rounded-lg bg-slate-700 border border-slate-600 text-white mt-1 text-lg font-bold"
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4 mt-4">
+                                <div className="bg-red-900/30 border border-red-800 rounded-xl p-4 text-center">
+                                    <div className="text-2xl mb-2">🛒</div>
+                                    <div className="font-bold text-red-400">BUY IT</div>
+                                    <div className="text-slate-400 text-sm mt-2">You get: {itemName}</div>
+                                    <div className="text-red-500 font-bold mt-1">Future Value: $0</div>
+                                </div>
+                                <div className="bg-green-900/30 border border-green-800 rounded-xl p-4 text-center">
+                                    <div className="text-2xl mb-2">💰</div>
+                                    <div className="font-bold text-green-400">SAVE IT</div>
+                                    <div className="text-slate-400 text-sm mt-2">In stocks at 10%:</div>
+                                    <div className="text-green-400 font-bold mt-1">
+                                        ${(itemPrice * Math.pow(1.10, 18 - age)).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="bg-gradient-to-r from-yellow-900/50 to-amber-900/50 rounded-lg p-3 text-center">
+                                <span className="text-yellow-400 font-bold">
+                                    💡 Saving could turn ${itemPrice} into ${(itemPrice * Math.pow(1.10, 18 - age)).toFixed(0)} by age 18!
+                                </span>
+                            </div>
+                        </div>
+                    </Modal>
+
+                    {/* Progress Report Modal */}
+                    <Modal isOpen={showProgressReport} onClose={() => setShowProgressReport(false)} title="📊 Progress Report">
+                        <div className="space-y-4">
+                            <div className="text-center border-b border-slate-700 pb-4">
+                                <div className="text-4xl mb-2">🏆</div>
+                                <h3 className="text-xl font-bold">Ezra's Money Report</h3>
+                                <p className="text-slate-400 text-sm">Current Age: {age}</p>
+                            </div>
+
+                            <div className="space-y-3">
+                                <div className="flex justify-between items-center p-3 bg-slate-700/50 rounded-lg">
+                                    <span>Total Wealth</span>
+                                    <span className="text-green-400 font-bold">${totalMoney.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                </div>
+                                <div className="flex justify-between items-center p-3 bg-slate-700/50 rounded-lg">
+                                    <span>Profit Earned</span>
+                                    <span className="text-green-400 font-bold">+${profit.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                </div>
+                                <div className="flex justify-between items-center p-3 bg-slate-700/50 rounded-lg">
+                                    <span>🔥 Current Streak</span>
+                                    <span className="text-orange-400 font-bold">{streak.count} days</span>
+                                </div>
+                                <div className="flex justify-between items-center p-3 bg-slate-700/50 rounded-lg">
+                                    <span>🎯 Goal Progress</span>
+                                    <span className="text-yellow-400 font-bold">{goalProgress.toFixed(1)}%</span>
+                                </div>
+                            </div>
+
+                            <div className="border-t border-slate-700 pt-4">
+                                <h4 className="font-bold mb-2">Badges Earned</h4>
+                                <div className="flex flex-wrap gap-2">
+                                    {badges.timeTravel && <span className="bg-slate-700 px-2 py-1 rounded text-sm">⏰ Time Traveler</span>}
+                                    {badges.tenK && <span className="bg-slate-700 px-2 py-1 rounded text-sm">💰 $10K Club</span>}
+                                    {badges.coinRules && <span className="bg-slate-700 px-2 py-1 rounded text-sm">🎓 Money Expert</span>}
+                                    {badges.quiz && <span className="bg-slate-700 px-2 py-1 rounded text-sm">🏆 Quiz Master</span>}
+                                    {badges.weekStreak && <span className="bg-slate-700 px-2 py-1 rounded text-sm">🔥 7-Day Streak</span>}
+                                    {!Object.values(badges).some(b => b) && <span className="text-slate-500">No badges yet - keep exploring!</span>}
+                                </div>
+                            </div>
+
+                            <button
+                                onClick={() => window.print()}
+                                className="w-full py-3 bg-indigo-600 hover:bg-indigo-500 rounded-lg font-bold transition-colors"
+                            >
+                                🖨️ Print Report
+                            </button>
+                        </div>
+                    </Modal>
+
+                    {/* Money Story Modal */}
+                    <Modal isOpen={showMoneyStory} onClose={() => { setShowMoneyStory(false); setStoryPage(0); }} title="📖 The Adventure of Your Money">
+                        <div className="space-y-4">
+                            {/* Animated Mascot */}
+                            <div className="text-center">
+                                <div className={`text-6xl inline-block ${storyPage === 4 ? 'animate-bounce' : ''}`}>
+                                    {storyPage === 0 && '🐷'}
+                                    {storyPage === 1 && '😴'}
+                                    {storyPage === 2 && '🌱'}
+                                    {storyPage === 3 && '🚀'}
+                                    {storyPage === 4 && '🎉'}
+                                </div>
+                            </div>
+
+                            {/* Story Pages */}
+                            <div className="bg-slate-700/50 rounded-xl p-4 min-h-[150px]">
+                                {storyPage === 0 && (
+                                    <div className="text-center">
+                                        <h4 className="text-xl font-bold mb-2">Meet Penny the Piggy Bank! 🐷</h4>
+                                        <p className="text-slate-300">Penny loves to hold your money safe. But Penny has a secret... there are MAGICAL places where your money can grow all by itself!</p>
+                                    </div>
+                                )}
+                                {storyPage === 1 && (
+                                    <div className="text-center">
+                                        <h4 className="text-xl font-bold mb-2">The Sleepy Checking Account 😴</h4>
+                                        <p className="text-slate-300">Some money lives in a checking account. It just sleeps there. It doesn't grow at all! Zzzzz...</p>
+                                        <p className="text-yellow-400 mt-2 font-bold">$100 stays $100 forever 😴</p>
+                                    </div>
+                                )}
+                                {storyPage === 2 && (
+                                    <div className="text-center">
+                                        <h4 className="text-xl font-bold mb-2">The Magic Garden of Stocks 🌱</h4>
+                                        <p className="text-slate-300">But if you plant your money in the stock market, it's like planting a seed! Every year, it grows about 10% - that's a dime for every dollar!</p>
+                                        <p className="text-green-400 mt-2 font-bold">$100 becomes $110, then $121, then $133...</p>
+                                    </div>
+                                )}
+                                {storyPage === 3 && (
+                                    <div className="text-center">
+                                        <h4 className="text-xl font-bold mb-2">The Rocket Power of Time! 🚀</h4>
+                                        <p className="text-slate-300">The most magical thing? The LONGER you wait, the FASTER it grows! Your money makes baby money, and the baby money makes MORE baby money!</p>
+                                        <p className="text-green-400 mt-2 font-bold">This is called COMPOUND INTEREST! ✨</p>
+                                    </div>
+                                )}
+                                {storyPage === 4 && (
+                                    <div className="text-center">
+                                        <h4 className="text-xl font-bold mb-2">You're a Money Expert Now! 🎉</h4>
+                                        <p className="text-slate-300">Now you know the secret: START EARLY, be PATIENT, and let your money grow!</p>
+                                        <p className="text-yellow-400 mt-2 font-bold">🌟 You're on your way to being rich, Ezra! 🌟</p>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Navigation */}
+                            <div className="flex justify-between items-center">
+                                <button
+                                    onClick={() => setStoryPage(p => Math.max(0, p - 1))}
+                                    disabled={storyPage === 0}
+                                    className={`px-4 py-2 rounded-lg font-bold ${storyPage === 0 ? 'bg-slate-700 text-slate-500' : 'bg-indigo-600 hover:bg-indigo-500'}`}
+                                >
+                                    ← Back
+                                </button>
+                                <div className="flex gap-1">
+                                    {[0, 1, 2, 3, 4].map(i => (
+                                        <div key={i} className={`w-2 h-2 rounded-full ${i === storyPage ? 'bg-yellow-400' : 'bg-slate-600'}`}></div>
+                                    ))}
+                                </div>
+                                <button
+                                    onClick={() => storyPage < 4 ? setStoryPage(p => p + 1) : setShowMoneyStory(false)}
+                                    className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 rounded-lg font-bold"
+                                >
+                                    {storyPage === 4 ? 'Done! ✓' : 'Next →'}
+                                </button>
+                            </div>
                         </div>
                     </Modal>
                 </div>
